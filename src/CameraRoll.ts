@@ -174,6 +174,11 @@ export type PhotoIdentifiersPage = {
 export type SaveToCameraRollOptions = {
   type?: 'photo' | 'video' | 'auto';
   album?: string;
+  latitude?: number;
+  longitude?: number;
+  altitude?: number;
+  horizontalAccuracy?: number;
+  verticalAccuracy?: number;
 };
 
 export type GetAlbumsParams = {
@@ -273,7 +278,7 @@ export class CameraRoll {
         type = 'video';
       else type = 'photo';
     }
-    return RNCCameraRoll.saveToCameraRoll(tag, {type, album});
+    return RNCCameraRoll.saveToCameraRoll(tag, {...options, type, album});
   }
 
   static saveToCameraRoll(
