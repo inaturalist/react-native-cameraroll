@@ -209,6 +209,25 @@ RCT_EXPORT_METHOD(saveToCameraRoll:(NSURLRequest *)request
       }
     } completionHandler:^(BOOL success, NSError *error) {
       if (success) {
+        // If the write succeeded but we don't have readwrite permission, that
+        // means we have addonly permission and we cannot read the file we
+        // just created to construct a response
+        if (@available(iOS 14, *)) {
+          PHAuthorizationStatus readWriteAuthStatus = [PHPhotoLibrary authorizationStatusForAccessLevel:PHAccessLevelReadWrite];
+          if (readWriteAuthStatus != PHAuthorizationStatusAuthorized) {
+            NSDictionary *addOnlyResponse = @{
+              @"node": @{
+                @"id": placeholder.localIdentifier,
+                @"type": options[@"type"],
+                @"image": @{
+                    @"uri": @"placeholder/readWritePermissionNotGranted"
+                }
+              }
+            };
+            resolve(addOnlyResponse);
+            return;
+          }
+        }
         PHFetchOptions *options = [PHFetchOptions new];
         options.includeHiddenAssets = YES;
         options.includeAllBurstAssets = YES;
