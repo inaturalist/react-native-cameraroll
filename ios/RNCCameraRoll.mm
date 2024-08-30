@@ -201,6 +201,18 @@ RCT_EXPORT_METHOD(saveToCameraRoll:(NSURLRequest *)request
           assetRequest = [PHAssetChangeRequest creationRequestForAssetFromImageAtFileURL:inputURI];
         }
       }
+      if (options[@"latitude"] && options[@"longitude"]) {
+        double latitude = [[options objectForKey:@"latitude"] doubleValue];
+        double longitude = [[options objectForKey:@"longitude"] doubleValue];
+        double altitude = [[options objectForKey:@"altitude"] doubleValue];
+        double horizontalAccuracy = [[options objectForKey:@"horizontalAccuracy"] doubleValue];
+        double verticalAccuracy = [[options objectForKey:@"verticalAccuracy"] doubleValue];
+        assetRequest.location = [[CLLocation alloc] initWithCoordinate:CLLocationCoordinate2DMake(latitude, longitude)
+                                      altitude:altitude
+                            horizontalAccuracy:horizontalAccuracy
+                              verticalAccuracy:verticalAccuracy
+                                     timestamp:[NSDate now]];
+      }
       placeholder = [assetRequest placeholderForCreatedAsset];
       if (![options[@"album"] isEqualToString:@""]) {
         photosAsset = [PHAsset fetchAssetsInAssetCollection:collection options:nil];
