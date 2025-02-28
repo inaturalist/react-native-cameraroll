@@ -177,6 +177,48 @@ public class CameraRollModule extends NativeCameraRollModuleSpec {
           FileUtils.copy(input, output);
           mediaDetails.clear();
           mediaDetails.put(Images.Media.IS_PENDING, 0);
+          
+          // Add location metadata if provided
+          if (mOptions.hasKey("latitude") && mOptions.hasKey("longitude")) {
+            try {
+              double latitude = mOptions.getDouble("latitude");
+              double longitude = mOptions.getDouble("longitude");
+              
+              // For Android Q and above, we need to use the ExifInterface with the file descriptor
+              if (!isVideo) {
+                try (OutputStream os = resolver.openOutputStream(mediaContentUri)) {
+                  // Save the file first
+                  try (AssetFileDescriptor fd = resolver.openAssetFileDescriptor(mediaContentUri, "r")) {
+                    if (fd != null) {
+                      ExifInterface exifInterface = new ExifInterface(fd.getFileDescriptor());
+                      
+                      // Convert GPS coordinates to EXIF format
+                      exifInterface.setAttribute(ExifInterface.TAG_GPS_LATITUDE, convertToExifLatLong(latitude, true));
+                      exifInterface.setAttribute(ExifInterface.TAG_GPS_LATITUDE_REF, latitude >= 0 ? "N" : "S");
+                      exifInterface.setAttribute(ExifInterface.TAG_GPS_LONGITUDE, convertToExifLatLong(longitude, false));
+                      exifInterface.setAttribute(ExifInterface.TAG_GPS_LONGITUDE_REF, longitude >= 0 ? "E" : "W");
+                      
+                      // Add altitude if provided
+                      if (mOptions.hasKey("altitude")) {
+                        double altitude = mOptions.getDouble("altitude");
+                        exifInterface.setAttribute(ExifInterface.TAG_GPS_ALTITUDE, 
+                            String.valueOf((int)Math.abs(altitude * 1000.0)));
+                        exifInterface.setAttribute(ExifInterface.TAG_GPS_ALTITUDE_REF, 
+                            altitude >= 0 ? "0" : "1");
+                      }
+                      
+                      // Save the changes
+                      exifInterface.saveAttributes();
+                    }
+                  }
+                }
+              }
+            } catch (Exception e) {
+              // Log the error but don't fail the entire operation
+              FLog.e(ReactConstants.TAG, "Error setting image location metadata", e);
+            }
+          }
+          
           resolver.update(mediaContentUri, mediaDetails, null, null);
 
           WritableMap asset = getSingleAssetInfo(mediaContentUri);
@@ -230,6 +272,36 @@ public class CameraRollModule extends NativeCameraRollModuleSpec {
           input.close();
           output.close();
 
+          // Add location metadata if provided
+          if (mOptions.hasKey("latitude") && mOptions.hasKey("longitude") && !isVideo) {
+            try {
+              double latitude = mOptions.getDouble("latitude");
+              double longitude = mOptions.getDouble("longitude");
+              
+              ExifInterface exifInterface = new ExifInterface(dest.getAbsolutePath());
+              
+              // Convert GPS coordinates to EXIF format
+              exifInterface.setAttribute(ExifInterface.TAG_GPS_LATITUDE, convertToExifLatLong(latitude, true));
+              exifInterface.setAttribute(ExifInterface.TAG_GPS_LATITUDE_REF, latitude >= 0 ? "N" : "S");
+              exifInterface.setAttribute(ExifInterface.TAG_GPS_LONGITUDE, convertToExifLatLong(longitude, false));
+              exifInterface.setAttribute(ExifInterface.TAG_GPS_LONGITUDE_REF, longitude >= 0 ? "E" : "W");
+              
+              // Add altitude if provided
+              if (mOptions.hasKey("altitude")) {
+                double altitude = mOptions.getDouble("altitude");
+                exifInterface.setAttribute(ExifInterface.TAG_GPS_ALTITUDE, 
+                    String.valueOf((int)Math.abs(altitude * 1000.0)));
+                exifInterface.setAttribute(ExifInterface.TAG_GPS_ALTITUDE_REF, 
+                    altitude >= 0 ? "0" : "1");
+              }
+              
+              // Save the changes
+              exifInterface.saveAttributes();
+            } catch (Exception e) {
+              // Log the error but don't fail the entire operation
+              FLog.e(ReactConstants.TAG, "Error setting image location metadata", e);
+            }
+          }
 
           MediaScannerConnection.scanFile(
                   mContext,
@@ -1099,4 +1171,38 @@ public class CameraRollModule extends NativeCameraRollModuleSpec {
 
   public void addListener(String eventName) {}
   public void removeListeners(double count) {}
+
+  /**
+   * Converts coordinate to EXIF format which is
+   * degrees, minutes, and seconds (DMS) format
+   * 
+   * @param coordinate the latitude or longitude coordinate
+   * @param isLatitude whether this is a latitude coordinate (affects formatting)
+   * @return String representation in DMS format
+   */
+  private static String convertToExifLatLong(double coordinate, boolean isLatitude) {
+    // Convert to absolute value for calculation
+    coordinate = Math.abs(coordinate);
+    
+    // Calculate degrees, minutes, seconds
+    int degrees = (int)coordinate;
+    double minutesDouble = (coordinate - degrees) * 60;
+    int minutes = (int)minutesDouble;
+    double seconds = (minutesDouble - minutes) * 60;
+    
+    // Format as rational numbers
+    // Degrees is stored as a rational number with denominator of 1
+    String degreeStr = degrees + "/1";
+    
+    // Minutes is stored as a rational number with denominator of 1
+    String minuteStr = minutes + "/1";
+    
+    // Seconds is stored as a rational number with numerator and denominator
+    // We use 1000 as the denominator for 3 decimal precision
+    int secondsNumerator = (int)(seconds * 1000);
+    String secondStr = secondsNumerator + "/1000";
+    
+    // Combine all parts with comma separator
+    return degreeStr + "," + minuteStr + "," + secondStr;
+  }
 }
