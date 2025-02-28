@@ -33,6 +33,24 @@ describe('CameraRoll', () => {
       (NativeModule.saveToCameraRoll as jest.Mock).mock.calls,
     ).toMatchSnapshot();
   });
+  
+  it('Should pass location data to saveToCameraRoll', async () => {
+    const locationOptions = {
+      type: 'photo',
+      album: 'Test Album',
+      latitude: 37.7749,
+      longitude: -122.4194,
+      altitude: 100
+    };
+    await CameraRoll.saveAsset('a tag', locationOptions);
+    expect(
+      (NativeModule.saveToCameraRoll as jest.Mock).mock.calls[0][1],
+    ).toEqual(expect.objectContaining({
+      latitude: 37.7749,
+      longitude: -122.4194,
+      altitude: 100
+    }));
+  });
 
   it('Should call getPhotos', async () => {
     await CameraRoll.getPhotos({first: 0});
